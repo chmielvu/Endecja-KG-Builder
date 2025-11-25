@@ -21,6 +21,15 @@
                 900: '#18181b',
                 950: '#09090b',
               }
+            },
+            keyframes: {
+              'slide-up': {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            },
+            animation: {
+              'slide-up': 'slide-up 0.3s ease-out forwards',
             }
           }
         }
@@ -43,7 +52,13 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "zustand": "https://aistudiocdn.com/zustand@^5.0.8",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "cytoscape": "https://aistudiocdn.com/cytoscape@^3.33.1"
+    "cytoscape": "https://aistudiocdn.com/cytoscape@^3.33.1",
+    "graphology": "https://esm.sh/graphology@0.25.4",
+    "graphology-communities-louvain": "https://esm.sh/graphology-communities-louvain@2.0.1?external=graphology",
+    "graphology-metrics/centrality/pagerank": "https://esm.sh/graphology-metrics@2.3.0/centrality/pagerank?external=graphology",
+    "graphology-centrality/betweenness": "https://esm.sh/graphology-centrality@2.1.1/betweenness?external=graphology",
+    "graphology-layout-forceatlas2": "https://esm.sh/graphology-layout-forceatlas2@0.10.1?external=graphology",
+    "graphology-metrics/": "https://aistudiocdn.com/graphology-metrics@^2.4.0/"
   }
 }
 </script>

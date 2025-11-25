@@ -1,49 +1,70 @@
 
-export type NodeType = 'person' | 'organization' | 'event' | 'concept' | 'publication' | 'Person' | 'Organization' | 'Event' | 'Concept' | 'Publication';
+export type HistoricalNodeType = 'person' | 'org' | 'faction' | 'event' | 'belief' | 'source' | 'role' | 'time';
 
-export interface NodeData {
+export interface HistoricalNode {
   id: string;
   label: string;
-  type: NodeType;
-  year?: number; // Approximate year of relevance
-  description?: string;
-  dates?: string;
-  importance?: number;
-  // Metrics
-  degreeCentrality?: number;
+  type: HistoricalNodeType;
+  start?: string;  // ISO string or YYYY
+  end?: string;
+  description: string;
+  sources: string[];  // [Author, "Title" (Year)]
+  certainty: 'confirmed' | 'disputed' | 'alleged';
+  image?: string;  // base64 SVG or url
+  
+  // Metrics calculated runtime
+  degree?: number;
   pagerank?: number;
-  community?: number; // Louvain community ID
+  betweenness?: number;
+  community?: number;
   kCore?: number;
+  modularity?: number; // Added for consistency
+  balance?: number; // Added for consistency
+  
+  // Layout
+  x?: number;
+  y?: number;
 }
 
-export interface EdgeData {
+export interface HistoricalEdge {
   id: string;
   source: string;
   target: string;
-  label: string; // relationship
-  dates?: string;
-  weight?: number;
+  label: string;  // relationship label for display
+  type: string;   // normalized type e.g., "founded", "rival_of"
+  start?: string;
+  end?: string;
+  weight: number;  // 0.1–1.0
+  sign: 'positive' | 'negative';  // For structural balance
+  sources: string[];
+  certainty: 'confirmed' | 'disputed' | 'alleged';
+  notes?: string;
 }
 
 export interface GraphNode {
-  data: NodeData;
+  data: HistoricalNode;
   position?: { x: number; y: number };
 }
 
 export interface GraphEdge {
-  data: EdgeData;
+  data: HistoricalEdge;
 }
 
 export interface KnowledgeGraph {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  meta?: { 
+    modularity?: number; 
+    balance?: number; 
+    lastEnriched?: number;
+  };
 }
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  reasoning?: string; // For ReAct display
+  reasoning?: string; // For ReAct display, e.g., "Thought: ..., Action: ..., Observation: ..."
   timestamp: number;
   sources?: Array<{ title: string; uri: string }>;
 }
@@ -56,8 +77,8 @@ export interface Toast {
 }
 
 export interface DuplicateCandidate {
-  nodeA: NodeData;
-  nodeB: NodeData;
+  nodeA: HistoricalNode;
+  nodeB: HistoricalNode;
   similarity: number;
 }
 

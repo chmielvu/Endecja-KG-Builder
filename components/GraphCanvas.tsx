@@ -1,8 +1,10 @@
+
+
 import React, { useEffect, useRef } from 'react';
 import cytoscape from 'cytoscape';
 import { useStore } from '../store';
 import { COLORS, COMMUNITY_COLORS } from '../constants';
-import { NodeData } from '../types';
+import { HistoricalNode, HistoricalEdge } from '../types';
 
 export const GraphCanvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -12,6 +14,7 @@ export const GraphCanvas: React.FC = () => {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Initialize Cytoscape instance only once
     cyRef.current = cytoscape({
       container: containerRef.current,
       style: [
@@ -20,138 +23,140 @@ export const GraphCanvas: React.FC = () => {
           style: {
             'label': 'data(label)',
             'color': '#ffffff',
-            'font-size': '12px',
+            'font-size': '10px',
             'text-valign': 'bottom',
-            'text-margin-y': 5,
-            'text-background-opacity': 0.7,
-            'text-background-color': '#000',
+            'text-margin-y': 4,
+            'text-background-opacity': 0.8,
+            'text-background-color': '#09090b',
             'text-background-padding': '2px',
             'text-background-shape': 'roundrectangle',
-            'border-color': '#fff',
             'border-width': 1,
+            'border-color': '#ffffff',
+            'width': 20,
+            'height': 20,
+            'text-wrap': 'wrap', // Allow text to wrap for longer labels
+            'text-max-width': '80px', // Max width for wrapped labels
           }
         },
         {
           selector: 'edge',
           style: {
-            'width': 1,
-            'line-color': '#52525b', // zinc-600
-            'target-arrow-color': '#52525b',
-            'target-arrow-shape': 'triangle',
+            'width': 1.5,
             'curve-style': 'bezier',
-            'opacity': 0.5
+            'target-arrow-shape': 'triangle',
+            'arrow-scale': 1.2,
+            'label': 'data(label)',
+            'font-size': '8px',
+            'text-rotation': 'autorotate',
+            'text-background-opacity': 1,
+            'text-background-color': '#09090b',
+            'color': '#71717a',
+            'text-border-width': 1, // Add border to text for better contrast
+            'text-border-color': '#09090b',
+            'text-border-opacity': 0.5,
+          }
+        },
+        {
+          selector: 'edge[sign="negative"]',
+          style: {
+            'line-color': '#ef4444', // Red for rivalry/conflict
+            'target-arrow-color': '#ef4444',
+            'line-style': 'dashed'
+          }
+        },
+        {
+          selector: 'edge[sign="positive"]',
+          style: {
+            'line-color': '#52525b', // Zinc for normal/positive relations
+            'target-arrow-color': '#52525b'
           }
         },
         {
           selector: ':selected',
           style: {
             'border-width': 3,
-            'border-color': '#facc15', // yellow-400
+            'border-color': '#facc15', // Amber for selected
             'background-color': '#facc15'
           }
         }
       ],
-      layout: { name: 'grid' }, // Initial layout
+      layout: { name: 'preset' }, // Positions are pre-calculated by Graphology's ForceAtlas2
       wheelSensitivity: 0.2,
+      maxZoom: 3,
+      minZoom: 0.2
     });
 
-    cyRef.current.on('tap', 'node', (evt) => {
-      const node = evt.target;
-      setSelectedNode(node.id());
-    });
-
+    // Event listeners
+    cyRef.current.on('tap', 'node', (evt) => setSelectedNode(evt.target.id()));
     cyRef.current.on('tap', (evt) => {
-      if (evt.target === cyRef.current) {
-        setSelectedNode(null);
-      }
+      // If tapping on the background, deselect node
+      if (evt.target === cyRef.current) setSelectedNode(null);
     });
 
-    return () => {
-      if (cyRef.current) cyRef.current.destroy();
-    };
-  }, []);
+    // Cleanup on unmount
+    return () => { if (cyRef.current) cyRef.current.destroy(); };
+  }, []); // Empty dependency array ensures this runs only once on mount
 
-  // Update Data & Layout
+  // Update graph elements when filteredGraph changes
   useEffect(() => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
 
-    // Batch update
     cy.batch(() => {
-      cy.elements().remove();
-      
+      cy.elements().remove(); // Clear existing elements
+
       const cyNodes = filteredGraph.nodes.map(n => ({
         group: 'nodes',
-        data: n.data
+        data: n.data,
+        // Use pre-calculated x, y positions or default to (0,0)
+        position: { x: n.data.x || 0, y: n.data.y || 0 }
       }));
-      
       const cyEdges = filteredGraph.edges.map(e => ({
         group: 'edges',
         data: e.data
       }));
-
       cy.add([...cyNodes, ...cyEdges]);
     });
+    
+    // Fit to view only if there are elements and it's a relatively small graph
+    if (filteredGraph.nodes.length > 0 && filteredGraph.nodes.length < 50) {
+      cy.fit(undefined, 50); // Fit all elements with 50px padding
+    }
+  }, [filteredGraph]); // Re-run when filteredGraph object changes
 
-    // Run Layout (Using cose as a stand-in for fcose for reliability in this env)
-    cy.layout({
-      name: 'cose',
-      animate: true,
-      animationDuration: 800,
-      refresh: 20,
-      fit: true,
-      padding: 30,
-      randomize: false,
-      componentSpacing: 100,
-      nodeRepulsion: (node: any) => 400000,
-      nodeOverlap: 10,
-      idealEdgeLength: (edge: any) => 100,
-      edgeElasticity: (edge: any) => 100,
-      nestingFactor: 5,
-      gravity: 80,
-      numIter: 1000,
-      initialTemp: 200,
-      coolingFactor: 0.95,
-      minTemp: 1.0
-    } as any).run();
-
-  }, [filteredGraph]);
-
-  // Update Styling
+  // Update node styles based on activeCommunityColoring or other metrics
   useEffect(() => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
 
     cy.batch(() => {
       cy.nodes().forEach(ele => {
-        const data = ele.data() as NodeData;
+        const data = ele.data() as HistoricalNode; // Cast to HistoricalNode for type safety
         
-        // Size based on PageRank
-        const baseSize = 20;
-        const size = baseSize + ((data.pagerank || 0) * 500); // Scale up
+        // Dynamic Node Size based on Degree and PageRank
+        const size = Math.max(20, (data.degree || 1) * 3 + (data.pagerank || 0) * 500);
         ele.style('width', size);
         ele.style('height', size);
 
-        // Color
-        let color = '#9ca3af'; // Default gray
-        if (activeCommunityColoring && data.community !== undefined) {
+        // Dynamic Node Color
+        let color = '#71717a'; // Default fallback color
+        if (activeCommunityColoring && data.community !== undefined && data.community !== -1) {
+          // Color by community if active and community is detected
           color = COMMUNITY_COLORS[data.community % COMMUNITY_COLORS.length];
         } else {
+          // Otherwise, color by node type
           color = COLORS[data.type] || color;
         }
         ele.style('background-color', color);
+
+        // Border width based on kCore (if available)
+        // ele.style('border-width', (data.kCore || 0) * 2); // Re-add kCore when available
       });
     });
-
-  }, [filteredGraph, activeCommunityColoring]);
+  }, [filteredGraph, activeCommunityColoring]); // Re-run when these dependencies change
 
   return (
-    <div className="w-full h-full bg-zinc-950 relative overflow-hidden">
-      <div className="absolute top-4 left-4 z-10 pointer-events-none">
-        <div className="text-zinc-500 text-xs font-mono">
-          Nodes: {filteredGraph.nodes.length} | Edges: {filteredGraph.edges.length}
-        </div>
-      </div>
+    <div className="w-full h-full bg-zinc-950 relative">
       <div ref={containerRef} className="w-full h-full" />
     </div>
   );
